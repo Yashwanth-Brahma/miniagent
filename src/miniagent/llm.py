@@ -1,6 +1,7 @@
 from __future__ import annotations
 from miniagent.types import ContentBlock
 from pydantic import TypeAdapter, json
+from miniagent.trace import log_call
 
 import asyncio
 import time
@@ -37,6 +38,12 @@ def _map_stop_reason(raw: str | None) -> StopReason:
         return "other"
     return _STOP_MAP.get(raw, "other")
 
+def _provider_of(model: str) -> str:
+    if model.startswith("claude"):
+        return "anthropic"
+    if model.startswith(("gpt", "o1", "o3", "o4")):
+        return "openai"
+    return "unknown"
 
 async def complete(
     messages: list[Message],
@@ -48,17 +55,40 @@ async def complete(
     temperature: float = 1.0,
 ) -> Response:
     start = time.perf_counter()
+    response: Response | None = None
+    error: Exception | None = None
     try:
         if model.startswith("claude"):
-            resp = await _complete_anthropic(messages, model=model, system=system, tools=tools, max_tokens=max_tokens, temperature=temperature)
+            response = await _complete_anthropic(
+                messages, model=model, system=system, tools=tools,
+                max_tokens=max_tokens, temperature=temperature,
+            )
         elif model.startswith(("gpt", "o1", "o3", "o4")):
-            resp = await _complete_openai(messages, model=model, system=system, tools=tools, max_tokens=max_tokens, temperature=temperature)
+            response = await _complete_openai(
+                messages, model=model, system=system, tools=tools,
+                max_tokens=max_tokens, temperature=temperature,
+            )
         else:
             raise ValueError(f"Unknown model: {model}")
-        return resp
+        return response
+    except Exception as e:
+        error = e
+        raise
     finally:
-        latency_ms = (time.perf_counter() - start) * 1000
-
+        log_call(
+            provider=_provider_of(model),
+            model=model,
+            request={
+                "messages": [m.model_dump() for m in messages],
+                "system": system,
+                "tools": tools,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            },
+            response=response.model_dump() if response else None,
+            error=repr(error) if error else None,
+            latency_ms=(time.perf_counter() - start) * 1000,
+        )
 
 def _to_anthropic_messages(messages: list[Message]) -> list[dict[str, Any]]:
     return [m.model_dump() for m in messages]
@@ -148,9 +178,13 @@ async def _complete_openai(
 
 
 async def main():
-    r = await complete([Message.user_text("Say hi in 3 words")], model="gpt-5.6-luna", max_tokens=50)
-    assert r.stop_reason == "end_turn"
-    print(r.content[0], TextBlock)
-    print(r.stop_reason, r.usage.input_tokens, r.usage.output_tokens)
+    try:
+        r = await complete([Message.user_text("Say hi in 3 words")], model="gpt-5.6-luna", max_tokens=50)
+        assert r.stop_reason == "end_turn"
+        print(r.content[0], TextBlock)
+        print(r.stop_reason, r.usage.input_tokens, r.usage.output_tokens)
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        pass
 
 asyncio.run(main())
