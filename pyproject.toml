@@ -18,3 +18,16 @@ miniagent = "miniagent:main"
 [build-system]
 requires = ["uv_build>=0.11.32,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.mypy]
+strict = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
