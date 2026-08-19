@@ -179,7 +179,7 @@ async def _complete_openai(
 
 async def main():
     try:
-        r = await complete([Message.user_text("Say hi in 3 words")], model="gpt-5.6-luna", max_tokens=50)
+        r = await complete([Message.user_text("Say hi in 3 words")], model="claude-haiku-4-5-20251001", max_tokens=50)
         assert r.stop_reason == "end_turn"
         print(r.content[0], TextBlock)
         print(r.stop_reason, r.usage.input_tokens, r.usage.output_tokens)
