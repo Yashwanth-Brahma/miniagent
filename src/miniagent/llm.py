@@ -12,6 +12,7 @@ from openai import AsyncOpenAI
 
 from miniagent.errors import LLMError
 from miniagent.types import Message, Response, StopReason, Usage, TextBlock, ToolUseBlock
+from miniagent.cost import estimate_cost, record_spend, get_session_spend
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -70,6 +71,8 @@ async def complete(
             )
         else:
             raise ValueError(f"Unknown model: {model}")
+        call_cost = record_spend(model, response.usage)
+        print(f"Call cost: ${call_cost:.6f}, Session spend: ${get_session_spend():.6f}")
         return response
     except Exception as e:
         error = e
@@ -88,6 +91,7 @@ async def complete(
             response=response.model_dump() if response else None,
             error=repr(error) if error else None,
             latency_ms=(time.perf_counter() - start) * 1000,
+            cost_usd=f"{estimate_cost(model, response.usage):.6f}" if response else "0.000000"
         )
 
 def _to_anthropic_messages(messages: list[Message]) -> list[dict[str, Any]]:

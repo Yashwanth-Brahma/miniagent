@@ -17,6 +17,7 @@ def log_call(
     response: dict[str, Any] | None,
     error: str | None,
     latency_ms: float,
+    cost_usd: str
 ) -> None:
     TRACE_DIR.mkdir(exist_ok=True)
     record = {
@@ -28,6 +29,7 @@ def log_call(
         "request": request,
         "response": response,
         "error": error,
+        "cost_usd": cost_usd,
     }
     with (TRACE_DIR / "calls.jsonl").open("a") as f:
         f.write(json.dumps(record, default=str) + "\n")
