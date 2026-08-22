@@ -119,6 +119,7 @@ async def _complete_anthropic(
             messages=anthropic_messages,
             max_tokens=max_tokens,
             temperature=temperature,
+            tools=tools
         )
     except Exception as e:
         raise LLMError(str(e), retryable=True) from e
@@ -151,6 +152,7 @@ async def _complete_openai(
             messages=openai_messages,
             max_completion_tokens=max_tokens,
             temperature=temperature,
+            tools=tools
         )
     except Exception as e:
         raise LLMError(str(e), retryable=True) from e
@@ -181,14 +183,14 @@ async def _complete_openai(
     )
 
 
-async def main():
-    try:
-        r = await complete([Message.user_text("Say hi in 3 words")], model="claude-haiku-4-5-20251001", max_tokens=50)
-        assert r.stop_reason == "end_turn"
-        print(r.content[0], TextBlock)
-        print(r.stop_reason, r.usage.input_tokens, r.usage.output_tokens)
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        pass
+# async def main():
+#     try:
+#         r = await complete([Message.user_text("Say hi in 3 words")], model="claude-haiku-4-5-20251001", max_tokens=50)
+#         assert r.stop_reason == "end_turn"
+#         print(r.content[0], TextBlock)
+#         print(r.stop_reason, r.usage.input_tokens, r.usage.output_tokens)
+#     except Exception as e:
+#         print(f"Error occurred: {e}")
+#         pass
 
-asyncio.run(main())
+# asyncio.run(main())
