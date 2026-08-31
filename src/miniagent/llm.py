@@ -119,7 +119,8 @@ async def _complete_anthropic(
             messages=anthropic_messages,
             max_tokens=max_tokens,
             temperature=temperature,
-            tools=tools
+            tools=tools, 
+            system=system
         )
     except Exception as e:
         raise LLMError(str(e), retryable=True) from e
@@ -152,7 +153,8 @@ async def _complete_openai(
             messages=openai_messages,
             max_completion_tokens=max_tokens,
             temperature=temperature,
-            tools=tools
+            tools=tools,
+            system=system
         )
     except Exception as e:
         raise LLMError(str(e), retryable=True) from e

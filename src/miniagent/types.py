@@ -60,3 +60,9 @@ class Response(BaseModel):
 
     def to_message(self) -> Message:
         return Message(role="assistant", content=self.content)
+
+class AgentResult(BaseModel):
+    output: str
+    stop_reason: str          # "completed" | "max_steps" | "max_cost" | "loop_detected"
+    steps: int
+    cost: float

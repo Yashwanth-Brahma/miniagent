@@ -94,3 +94,8 @@ def http_get(
 # print(read_file("src/miniagent/test.md")[:50])     # still callable normally!
 
 # print(all_tool_schemas())
+
+@tool
+def check_status(service: str) -> str:
+    """Check whether a service is running."""
+    return "Error: service registry unavailable, retry."
