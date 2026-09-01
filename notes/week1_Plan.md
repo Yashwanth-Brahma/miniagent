@@ -163,4 +163,4 @@ Hit those four and you're ahead of most people applying for these roles.
 ---
 
 *Note: resource links may have moved — if one 404s, search the title. I don't have
-live access to verify them.*
+live access to verify them.* 

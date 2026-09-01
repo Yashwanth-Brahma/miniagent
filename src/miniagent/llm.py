@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 from miniagent.errors import LLMError
 from miniagent.types import Message, Response, StopReason, Usage, TextBlock, ToolUseBlock
 from miniagent.cost import estimate_cost, record_spend, get_session_spend
+from miniagent.retry import llm_retry
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -46,6 +47,7 @@ def _provider_of(model: str) -> str:
         return "openai"
     return "unknown"
 
+@llm_retry
 async def complete(
     messages: list[Message],
     *,

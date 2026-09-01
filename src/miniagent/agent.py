@@ -4,8 +4,11 @@ from miniagent.llm import complete
 from miniagent.tools.dispatch import dispatch
 from miniagent.tools.registry import REGISTRY, all_tool_schemas
 from miniagent.types import Message, AgentResult, ToolResultBlock
-from miniagent.cost import get_session_spend
+from miniagent.cost import get_session_spend, estimate_cost
 import json
+import time
+import uuid
+from miniagent.spans import Span, write_span
 
 DEFAULT_SYSTEM = """You are a coding and research assistant with access to tools.
 - Use tools to gather real information rather than guessing.
@@ -26,6 +29,7 @@ async def run(
     max_cost: float = 0.50,
     max_repeats: int = 3,          # <-- same call this many times = stuck
 ) -> str:
+    run_id = str(uuid.uuid4())[:8]        # one id for this whole run
     history: list[Message] = [Message.user_text(task)]
     tools = all_tool_schemas()
     start_spend = get_session_spend()
@@ -37,8 +41,24 @@ async def run(
             return AgentResult(output=f"'{block.name}' repeated", stop_reason="max_cost",
                    steps=step + 1, cost=run_spend)
 
+        step_start = time.perf_counter()
         resp = await complete(history, model=model, tools=tools, max_tokens=max_tokens,system=DEFAULT_SYSTEM)
+        step_latency = (time.perf_counter() - step_start) * 1000
+
         history.append(resp.to_message())
+
+        # record the span for this step
+        write_span(Span(
+            run_id=run_id,
+            step=step + 1,
+            latency_ms=step_latency,
+            input_tokens=resp.usage.input_tokens,
+            output_tokens=resp.usage.output_tokens,
+            cost=estimate_cost(model, resp.usage),
+            tool_calls=[b.name for b in resp.tool_uses],
+            stop_reason=resp.stop_reason,
+        ))
+
 
         if resp.stop_reason != "tool_use":
             text_blocks = [b.text for b in resp.content if b.type == "text"]
@@ -49,6 +69,12 @@ async def run(
         # LOOP DETECTION — check each requested call's signature
         results = []
         for block in resp.tool_uses:
+            sig = _call_signature(block)
+            call_counts[sig] = call_counts.get(sig, 0) + 1
+            if call_counts[sig] >= max_repeats:
+                return (f"[stopped: '{block.name}' called with identical args "
+                        f"{max_repeats} times — agent appears stuck]")
+            
             fn = REGISTRY.get(block.name)
             if fn is not None and getattr(fn, "requires_approval", False):
                 # PAUSE and ask the human
