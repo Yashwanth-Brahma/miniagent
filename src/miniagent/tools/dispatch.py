@@ -4,6 +4,7 @@ from typing import Any
 
 from miniagent.tools.registry import REGISTRY
 from miniagent.types import ToolResultBlock, ToolUseBlock
+import miniagent.tools.dangerous  # registers shell and write_file
 
 
 def dispatch(block: ToolUseBlock) -> ToolResultBlock:

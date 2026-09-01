@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from miniagent.llm import complete
 from miniagent.tools.dispatch import dispatch
-from miniagent.tools.registry import all_tool_schemas
-from miniagent.types import Message, AgentResult
+from miniagent.tools.registry import REGISTRY, all_tool_schemas
+from miniagent.types import Message, AgentResult, ToolResultBlock
 from miniagent.cost import get_session_spend
 import json
 
@@ -47,17 +47,26 @@ async def run(
                    steps=step + 1, cost=run_spend)
 
         # LOOP DETECTION — check each requested call's signature
+        results = []
         for block in resp.tool_uses:
-            sig = _call_signature(block)
-            call_counts[sig] = call_counts.get(sig, 0) + 1
-            if call_counts[sig] >= max_repeats:
-                return AgentResult(output=f"'{block.name}' repeated", stop_reason="loop_detected",
-                   steps=step + 1, cost=run_spend)
-
-        results = [dispatch(block) for block in resp.tool_uses]
+            fn = REGISTRY.get(block.name)
+            if fn is not None and getattr(fn, "requires_approval", False):
+                # PAUSE and ask the human
+                print(f"\n⚠  The agent wants to call: {block.name}")
+                print(f"   with arguments: {block.input}")
+                answer = input("   Approve? [y/N] ").strip().lower()
+                if answer != "y":
+                    results.append(ToolResultBlock(
+                        tool_use_id=block.id,
+                        content="User denied permission to run this tool.",
+                        is_error=True,
+                    ))
+                    continue
+            results.append(dispatch(block))
         history.append(Message(role="user", content=results))
         run_spend = get_session_spend() - start_spend 
-        print(f"[agent] step {step + 1}/{max_steps}, spent ${run_spend:.4f}")
+        print(f"[agent] step {step + 1}/{max_steps}, spent ${run_spend:.4f}, stop_reason={resp.stop_reason}, tool_name={block.name}, ")
 
     return AgentResult(output=f"'{block.name}' repeated", stop_reason="max_steps",
                    steps=step + 1, cost=run_spend)
+

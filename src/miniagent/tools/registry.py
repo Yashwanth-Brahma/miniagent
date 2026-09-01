@@ -26,17 +26,22 @@ def tool_schema(fn: Callable[..., Any]) -> dict[str, Any]:
     }
 
 
-def tool(fn: Callable[..., Any]) -> Callable[..., Any]:
-    """Register a function as an agent tool."""
-    schema = tool_schema(fn) # <-- your Idea 3: compute schema once, attach to wrapper and preserve __name__/__doc__
+def tool(fn = None, *, requires_approval: bool = False):
+    """Register a function as an agent tool. Set requires_approval=True for irreversible actions."""
+    def decorator(f):
+        schema = tool_schema(f)
 
-    @functools.wraps(fn)              # <-- your Idea 4: keeps __name__ / __doc__
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        return fn(*args, **kwargs)
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            return f(*args, **kwargs)
 
-    wrapper.tool_schema = schema      # attach schema to the function object
-    REGISTRY[fn.__name__] = wrapper   # register by name as the callable. Any code that imports this module can now call REGISTRY["read_file"](...) to invoke the tool.
-    return wrapper
+        wrapper.tool_schema = schema
+        wrapper.requires_approval = requires_approval   # <-- the flag rides on the function
+        REGISTRY[f.__name__] = wrapper
+        return wrapper
+
+    # supports both @tool and @tool(requires_approval=True)
+    return decorator(fn) if fn else decorator
 
 def all_tool_schemas() -> list[dict[str, Any]]:
     return [fn.tool_schema for fn in REGISTRY.values()]
