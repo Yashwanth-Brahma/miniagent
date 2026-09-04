@@ -19,5 +19,5 @@ llm_retry = retry(
     retry=retry_if_exception(_is_retryable),      # which errors to retry
     stop=stop_after_attempt(4),                   # try at most 4 times
     wait=wait_exponential_jitter(initial=1, max=20),  # 1s, ~2s, ~4s... + jitter, capped
-    reraise=True,                                 # on final failure, raise the real error
+    reraise=False,                                 # on final failure, raise the real error
 )

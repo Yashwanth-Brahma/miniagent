@@ -14,6 +14,7 @@ from miniagent.errors import LLMError
 from miniagent.types import Message, Response, StopReason, Usage, TextBlock, ToolUseBlock
 from miniagent.cost import estimate_cost, record_spend, get_session_spend
 from miniagent.retry import llm_retry
+import json
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -62,11 +63,13 @@ async def complete(
     error: Exception | None = None
     try:
         if model.startswith("claude"):
+            system = system+ " Search, then answer. Do not exceed 3 searches before answering."
             response = await _complete_anthropic(
                 messages, model=model, system=system, tools=tools,
                 max_tokens=max_tokens, temperature=temperature,
             )
         elif model.startswith(("gpt", "o1", "o3", "o4")):
+            system = system+ " Base your answer ONLY on search_code results. Every claim must cite file:line. If search_code didn't return relevant code, say so do not answer from general knowledge."
             response = await _complete_openai(
                 messages, model=model, system=system, tools=tools,
                 max_tokens=max_tokens, temperature=temperature,
@@ -100,9 +103,59 @@ def _to_anthropic_messages(messages: list[Message]) -> list[dict[str, Any]]:
     return [m.model_dump() for m in messages]
 
 
-def _to_openai_messages(messages: list[Message]) -> list[dict[str, Any]]:
-    return [m.model_dump() for m in messages]
+def _to_openai_messages(messages: list[Message], system: str | None) -> list[dict]:
+    out: list[dict] = []
+    if system:
+        out.append({"role": "system", "content": system})
 
+    for msg in messages:
+        if msg.role == "assistant":
+            text_parts = [b.text for b in msg.content if b.type == "text"]
+            tool_uses = [b for b in msg.content if b.type == "tool_use"]
+
+            entry: dict = {"role": "assistant"}
+            entry["content"] = " ".join(text_parts) if text_parts else None
+            if tool_uses:
+                entry["tool_calls"] = [
+                    {
+                        "id": b.id,
+                        "type": "function",
+                        "function": {"name": b.name, "arguments": json.dumps(b.input)},
+                    }
+                    for b in tool_uses
+                ]
+            out.append(entry)
+
+        elif msg.role == "user":
+            tool_results = [b for b in msg.content if b.type == "tool_result"]
+            if tool_results:
+                # each tool_result becomes a SEPARATE role:"tool" message
+                for b in tool_results:
+                    out.append({
+                        "role": "tool",
+                        "tool_call_id": b.tool_use_id,
+                        "content": b.content,
+                    })
+            else:
+                text = " ".join(b.text for b in msg.content if b.type == "text")
+                out.append({"role": "user", "content": text})
+
+    return out
+
+def _tools_to_openai(tools: list[dict] | None) -> list[dict] | None:
+    if not tools:
+        return None
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t["input_schema"],
+            },
+        }
+        for t in tools
+    ]
 
 async def _complete_anthropic(
     messages: list[Message],
@@ -148,7 +201,8 @@ async def _complete_openai(
     max_tokens: int,
     temperature: float,
 ) -> Response:
-    openai_messages = _to_openai_messages(messages)
+    openai_messages = _to_openai_messages(messages,system=system)
+    tools = _tools_to_openai(tools)
     try:
         resp = await _openai.chat.completions.create(
             model=model,
@@ -156,7 +210,6 @@ async def _complete_openai(
             max_completion_tokens=max_tokens,
             temperature=temperature,
             tools=tools,
-            system=system
         )
     except Exception as e:
         raise LLMError(str(e), retryable=True) from e

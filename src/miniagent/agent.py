@@ -92,6 +92,7 @@ async def run(
         history.append(Message(role="user", content=results))
         run_spend = get_session_spend() - start_spend 
         print(f"[agent] step {step + 1}/{max_steps}, spent ${run_spend:.4f}, stop_reason={resp.stop_reason}, tool_name={block.name}, ")
+        # print(f"         tool_args={block.input}, tool_result={results[-1].content if results else 'N/A'}")
 
     return AgentResult(output=f"'{block.name}' repeated", stop_reason="max_steps",
                    steps=step + 1, cost=run_spend)

@@ -57,6 +57,7 @@ def read_file(
     max_bytes: Annotated[int, Field(description="Maximum bytes to read")] = 50_000,
 ) -> str:
     """Read a UTF-8 text file and return its contents."""
+    print(f"[read_file] path={path}, max_bytes={max_bytes}")
     from pathlib import Path
     return Path(path).read_text()[:max_bytes]
 
@@ -82,6 +83,7 @@ def http_get(
     max_chars: Annotated[int, Field(description="Max characters of the response body to return")] = 5_000,
 ) -> str:
     """Fetch the text body of a URL via HTTP GET. Returns truncated response text."""
+    print(f"[http_get] url={url}, max_chars={max_chars}")
     if not url.startswith(("http://", "https://")):
         return f"Error: url must start with http:// or https://, got '{url}'"
     try:
