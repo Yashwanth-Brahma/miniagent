@@ -6,6 +6,8 @@ from rank_bm25 import BM25Okapi
 
 from miniagent.retrieval.chunker import Chunk
 from miniagent.retrieval.code_chunker import chunk_python
+from dotenv import load_dotenv
+load_dotenv()
 
 _client = OpenAI()
 
