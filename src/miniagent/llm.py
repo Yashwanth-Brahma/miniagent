@@ -63,13 +63,13 @@ async def complete(
     error: Exception | None = None
     try:
         if model.startswith("claude"):
-            system = system+ " Search, then answer. Do not exceed 3 searches before answering."
+            # system = system+ " Search, then answer. Do not exceed 3 searches before answering."
             response = await _complete_anthropic(
                 messages, model=model, system=system, tools=tools,
                 max_tokens=max_tokens, temperature=temperature,
             )
         elif model.startswith(("gpt", "o1", "o3", "o4")):
-            system = system+ " Base your answer ONLY on search_code results. Every claim must cite file:line. If search_code didn't return relevant code, say so do not answer from general knowledge."
+            # system = system+ " Base your answer ONLY on search_code results. Every claim must cite file:line. If search_code didn't return relevant code, say so do not answer from general knowledge."
             response = await _complete_openai(
                 messages, model=model, system=system, tools=tools,
                 max_tokens=max_tokens, temperature=temperature,
@@ -166,16 +166,20 @@ async def _complete_anthropic(
     max_tokens: int,
     temperature: float,
 ) -> Response:
-    anthropic_messages = _to_anthropic_messages(messages)
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": _to_anthropic_messages(messages),
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if system:                       # only add if present
+        kwargs["system"] = system
+    if tools:                        # only add if non-empty — THIS is the fix
+        kwargs["tools"] = tools
 
     try:
         resp = await _anthropic.messages.create(
-            model=model,
-            messages=anthropic_messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            tools=tools, 
-            system=system
+            **kwargs
         )
     except Exception as e:
         raise LLMError(str(e), retryable=True) from e

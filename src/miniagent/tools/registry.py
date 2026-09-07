@@ -9,7 +9,7 @@ from pathlib import Path
 
 # the lookup table: tool name -> the callable
 REGISTRY: dict[str, Callable[..., Any]] = {}
-
+BLOCKED = {".env", ".git", "credentials", "id_rsa", ".pem", ".key"}
 
 def tool_schema(fn: Callable[..., Any]) -> dict[str, Any]:
     sig = inspect.signature(fn)
@@ -57,6 +57,10 @@ def read_file(
     max_bytes: Annotated[int, Field(description="Maximum bytes to read")] = 50_000,
 ) -> str:
     """Read a UTF-8 text file and return its contents."""
+    p = Path(path)
+    if any(part in BLOCKED or part.startswith(".env") for part in p.parts) \
+       or p.suffix in {".pem", ".key"}:
+        return "Error: reading secret/credential files is not permitted."
     print(f"[read_file] path={path}, max_bytes={max_bytes}")
     from pathlib import Path
     return Path(path).read_text()[:max_bytes]

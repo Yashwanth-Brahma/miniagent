@@ -28,6 +28,7 @@ async def run(
     max_steps: int = 10,
     max_cost: float = 0.50,
     max_repeats: int = 3,          # <-- same call this many times = stuck
+    system: str = DEFAULT_SYSTEM
 ) -> str:
     run_id = str(uuid.uuid4())[:8]        # one id for this whole run
     history: list[Message] = [Message.user_text(task)]
@@ -42,7 +43,7 @@ async def run(
                    steps=step + 1, cost=run_spend)
 
         step_start = time.perf_counter()
-        resp = await complete(history, model=model, tools=tools, max_tokens=max_tokens,system=DEFAULT_SYSTEM)
+        resp = await complete(history, model=model, tools=tools, max_tokens=max_tokens,system=system)
         step_latency = (time.perf_counter() - step_start) * 1000
 
         history.append(resp.to_message())
